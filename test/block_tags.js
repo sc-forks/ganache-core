@@ -1,7 +1,7 @@
 var Web3 = require('web3');
 var utils = require('ethereumjs-util');
 var assert = require('assert');
-var TestRPC = require("../index.js");
+var Ganache = require("../index.js");
 var fs = require("fs");
 var solc = require("solc");
 var async = require("async");
@@ -43,7 +43,7 @@ var contract = {
 
 describe("Block Tags", function() {
   var accounts;
-  var web3 = new Web3(TestRPC.provider());
+  var web3 = new Web3(Ganache.provider());
   var contractAddress;
 
   var initial_block_number;
@@ -111,12 +111,14 @@ describe("Block Tags", function() {
   it("should return the initial balance at the previous block number", function(done) {
     web3.eth.getBalance(accounts[0], initial_block_number, function(err, balance) {
       if (err) return done(err);
-      assert(balance.eq(initial.balance));
+      assert.equal(balance, initial.balance);
 
       // Check that the balance incremented with the block number, just to be sure.
       web3.eth.getBalance(accounts[0], initial_block_number + 1, function(err, balance) {
         if (err) return done(err);
-        assert(balance.lt(initial.balance));
+        var initialBalanceInEther = parseFloat(web3.utils.fromWei(initial.balance, 'ether'));
+        var balanceInEther = parseFloat(web3.utils.fromWei(balance, 'ether'));
+        assert(balanceInEther < initialBalanceInEther);
         done();
       });
     });

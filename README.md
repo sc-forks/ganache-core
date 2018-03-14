@@ -1,6 +1,6 @@
 [![npm](https://img.shields.io/npm/v/ganache-core.svg)]()
 [![npm](https://img.shields.io/npm/dm/ganache-core.svg)]()
-[![Build Status](https://travis-ci.org/trufflesuite/ganache-core.svg?branch=develop)](https://travis-ci.org/trufflesuite/ganache-core)
+[![Build Status](https://travis-ci.org/trufflesuite/ganache-core.svg?branch=master)](https://travis-ci.org/trufflesuite/ganache-core)
 # Ganache Core
 
 This is the core code that powers the Ganache application and the the Ganache command line tool.
@@ -45,14 +45,19 @@ Both `.provider()` and `.server()` take a single object which allows you to spec
 * `"mnemonic"`: Use a specific HD wallet mnemonic to generate initial addresses.
 * `"port"`: Port number to listen on when running as a server.
 * `"seed"`: Use arbitrary data to generate the HD wallet mnemonic to be used.
+* `"default_balance_ether"`: `number` - The default account balance, specified in ether.
 * `"total_accounts"`: `number` - Number of accounts to generate at startup.
 * `"fork"`: `string` or `object` - When a `string`, same as `--fork` option above. Can also be a Web3 Provider object, optionally used in conjunction with the `fork_block_number` option below.
-* `"fork_block_number"`: `string` or `number` - Block number the provider should fork from, when the `fork` option is specified. If the `fork` option is specified as a string including the `@` sign and a block number, the block number in the `fork` parameter takes precedence.  
+* `"fork_block_number"`: `string` or `number` - Block number the provider should fork from, when the `fork` option is specified. If the `fork` option is specified as a string including the `@` sign and a block number, the block number in the `fork` parameter takes precedence.
 * `"network_id"`: `integer` - Same as `--networkId` option above.
 * `"time"`: `Date` - Date that the first block should start. Use this feature, along with the `evm_increaseTime` method to test time-dependent code.
 * `"locked"`: `boolean` - whether or not accounts are locked by default.
 * `"unlocked_accounts"`: `Array` - array of addresses or address indexes specifying which accounts should be unlocked.
 * `"db_path"`: `String` - Specify a path to a directory to save the chain database. If a database already exists, that chain will be initialized instead of creating a new one.
+* `"db"`: `Object` - Specify an alternative database instance, for instance [MemDOWN](https://github.com/level/memdown).
+* `"ws"`: Enable a websocket server. This is `true` by default.
+* `"vmErrorsOnRPCResponse"`: Whether to report runtime errors from EVM code as RPC errors. This is `true` by default to replicate the error reporting behavior of previous versions of ganache.
+* `"hdPath"`: The hierarchical deterministic path to use when generating accounts. Default: "m/44'/60'/0'/0/"
 
 # IMPLEMENTED METHODS
 
@@ -91,6 +96,8 @@ The RPC methods currently implemented are:
 * `eth_sendTransaction`
 * `eth_sendRawTransaction`
 * `eth_sign`
+* `eth_subscribe` (only for websocket connections. "syncing" subscriptions are not yet supported)
+* `eth_unsubscribe` (only for websocket connections. "syncing" subscriptions are not yet supported)
 * `eth_syncing`
 * `eth_uninstallFilter`
 * `net_listening`
@@ -101,6 +108,7 @@ The RPC methods currently implemented are:
 * `personal_listAccounts`
 * `personal_lockAccount`
 * `personal_newAccount`
+* `personal_importRawKey`
 * `personal_unlockAccount`
 * `personal_sendTransaction`
 * `shh_version`

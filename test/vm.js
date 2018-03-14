@@ -2,11 +2,10 @@ var Web3 = require('web3');
 var Transaction = require('ethereumjs-tx');
 var utils = require('ethereumjs-util');
 var assert = require('assert');
-var TestRPC = require("../index.js");
+var Ganache = require("../index.js");
 var solc = require("solc");
 var fs = require("fs");
 var to = require("../lib/utils/to");
-var clone = require("clone");
 
 // Thanks solc. At least this works!
 // This removes solc's overzealous uncaughtException event handler.
@@ -19,7 +18,7 @@ var logger = {
 };
 
 var web3 = new Web3();
-web3.setProvider(TestRPC.provider({
+web3.setProvider(Ganache.provider({
   /*blocktime: 100,*/
   logger: logger,
   seed: "1337"
@@ -49,35 +48,29 @@ describe("revert opcode", function() {
     });
   });
 
-  it("should return a transaction receipt with status 0 on REVERT", function(done) {
+  it("should return a transaction receipt with status 0 on REVERT", function() {
     var revertCode = testContext.revertContract.binary;
     var revertAbi = JSON.parse(testContext.revertContract.abi);
     var callCount = 0;
 
-    var RevertContract = web3.eth.contract(revertAbi);
+    var RevertContract = new web3.eth.Contract(revertAbi);
     RevertContract._code = revertCode;
-    RevertContract.new({ data: revertCode, from: testContext.accounts[0], gas: 3141592 }, function (err, instance) {
-      callCount++;
-      if (err) {
-        return done(err);
-      }
-
-      if (instance.address) {
-        instance.alwaysReverts(5, { from: testContext.accounts[0] }, function(err, result) {
-          assert(err, "Expected error result not returned.");
-          var txHash = err.hashes[0];
-
-          web3.eth.getTransactionReceipt(txHash, function(err, receipt) {
-            if (err) {
-              return done(err);
-            }
-
-            assert.notEqual(receipt, null, "Transaction receipt shouldn't be null");
-            assert.equal(receipt.status, 0, "Reverted (failed) transactions should have a status of 0.");
-            return done();
-          });
-        });
-      }
-    });
+    return RevertContract.deploy({ data: revertCode })
+      .send({from: testContext.accounts[0], gas: 3141592 })
+      .then(function (instance) {
+        // TODO: ugly workaround - not sure why this is necessary.
+        if (!instance._requestManager.provider) {
+          instance._requestManager.setProvider(web3.eth._provider);
+        }
+        return instance.methods.alwaysReverts(5).send({ from: testContext.accounts[0] })
+      })
+      .catch(function(err){
+        assert.equal(err.results[err.hashes[0]].error, "revert", "Expected error result not returned.");
+        return web3.eth.getTransactionReceipt(err.hashes[0])
+      })
+      .then(function(receipt) {
+        assert.notEqual(receipt, null, "Transaction receipt shouldn't be null");
+        assert.equal(receipt.status, 0, "Reverted (failed) transactions should have a status of 0.");
+      });
   });
 });
