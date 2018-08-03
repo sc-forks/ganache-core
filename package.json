@@ -23,7 +23,7 @@
     "ethereumjs-block": "~1.2.2",
     "ethereumjs-tx": "1.3.4",
     "ethereumjs-util": "^5.2.0",
-    "ethereumjs-vm": "https://github.com/sc-forks/ethereumjs-vm-sc.git#6be86e6f12634b711423203e6744cafe07c38e69",
+    "ethereumjs-vm": "https://github.com/sc-forks/ethereumjs-vm-sc.git#ca57d6db1e837af72294db71011d532e2d22ea56",
     "ethereumjs-wallet": "0.6.0",
     "fake-merkle-patricia-tree": "~1.0.1",
     "heap": "~0.2.6",
