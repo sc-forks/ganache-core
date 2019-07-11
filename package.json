@@ -46,7 +46,7 @@
     "seedrandom": "3.0.1",
     "source-map-support": "0.5.12",
     "tmp": "0.1.0",
-    "web3-provider-engine": "14.2.0",
+    "web3-provider-engine": "https://github.com/sc-forks/provider-engine-sc.git#4f4fcb2f52b9b23e89db65c2c277373cc03e43ec",
     "websocket": "1.0.29"
   },
   "devDependencies": {
