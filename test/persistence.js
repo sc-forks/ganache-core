@@ -1,138 +1,222 @@
-var Web3 = require('web3');
-var TestRPC = require("../index.js");
-var assert = require('assert');
-var temp = require("temp").track();
-var fs = require("fs");
-var solc = require("solc");
+const Ganache = require(process.env.TEST_BUILD
+  ? "../build/ganache.core." + process.env.TEST_BUILD + ".js"
+  : "../index.js");
+const temp = require("temp").track();
+const memdown = require("memdown");
+const { join } = require("path");
+const assert = require("assert");
+const Web3 = require("web3");
+const generateSend = require("./helpers/utils/rpc");
+const compile = require("./helpers/contract/singleFileCompile");
 
-// Thanks solc. At least this works!
-// This removes solc's overzealous uncaughtException event handler.
-process.removeAllListeners("uncaughtException");
-
-var source = fs.readFileSync("./test/Example.sol", {encoding: "utf8"});
-var result = solc.compile(source, 1);
+const { result } = compile("./test/contracts/examples/", "Example");
 
 // Note: Certain properties of the following contract data are hardcoded to
 // maintain repeatable tests. If you significantly change the solidity code,
 // make sure to update the resulting contract data with the correct values.
-var contract = {
-  solidity: source,
-  abi: result.contracts[":Example"].interface,
-  binary: "0x" + result.contracts[":Example"].bytecode,
-  position_of_value: "0x0000000000000000000000000000000000000000000000000000000000000000",
-  expected_default_value: 5,
-  call_data: {
-    gas: '0x2fefd8',
-    gasPrice: '0x01', // This is important, as passing it has exposed errors in the past.
-    to: null, // set by test
-    data: '0x3fa4f245'
-  },
-  transaction_data: {
-    from: null, // set by test
-    gas: '0x2fefd8',
-    to: null, // set by test
-    data: '0x552410770000000000000000000000000000000000000000000000000000000000000019' // sets value to 25 (base 10)
-  }
-};
 
-describe("Persistence", function() {
-  var web3 = new Web3();
-  var provider;
-  var cleanup;
-  var accounts;
-  var db_path;
-  var tx_hash;
-  var web3 = new Web3();
+const runTests = function(providerInit) {
+  describe("Persistence ", function() {
+    const web3 = new Web3();
+    let accounts;
+    let tx;
+    let provider;
 
-  // initialize a persistant provider
-  before('init provider', function (done) {
-    temp.mkdir('testrpc-db-', function(err, dirPath) {
-      db_path = dirPath;
-      provider = TestRPC.provider({
-        db_path: dirPath,
-        mnemonic: "debris electric learn dove warrior grow pistol carry either curve radio hidden"
+    before("init provider", function() {
+      providerInit(function(p) {
+        provider = p;
+        web3.setProvider(p);
       });
-      web3.setProvider(provider);
-      done();
     });
-  });
 
-  before("Gather accounts", function(done) {
-    web3.eth.getAccounts(function(err, a) {
-      if (err) return done(err);
-      accounts = a;
-      done();
+    before("Gather accounts", async function() {
+      accounts = await web3.eth.getAccounts();
     });
-  });
 
-  before("send transaction", function (done) {
-    web3.eth.sendTransaction({
-      from: accounts[0],
-      gas: '0x2fefd8',
-      data: contract.binary
-    }, function(err, hash) {
-      if (err) return done(err);
-      tx_hash = hash;
-      done();
+    before("send transaction", async function() {
+      tx = await web3.eth.sendTransaction({
+        from: accounts[0],
+        gas: "0x2fefd8",
+        data: result.contracts["Example.sol"].Example.evm.bytecode.object
+      });
     });
-  });
 
-  it("should have block height 1", function (done) {
-    this.timeout(5000);
-    web3.eth.getBlockNumber(function(err, res) {
-      if (err) return done(err);
-
-      assert(res == 1);
-
+    it("should have block height 1", async function() {
+      let res = await web3.eth.getBlockNumber();
+      assert(res === 1);
       // Close the first provider now that we've gotten where we need to be.
       // Note: we specifically close the provider so we can read from the same db.
-      provider.close(done);
+      provider.close(() => null); // pass dummy fn to satisfy callback expectation
+    }).timeout(5000);
+
+    it("should reopen the provider", function() {
+      providerInit(function(p) {
+        provider = p;
+        web3.setProvider(provider);
+      });
+    }).slow(200);
+
+    it("should still be on block height 1", async function() {
+      const result = await web3.eth.getBlockNumber();
+      assert(result === 1);
+    }).timeout(5000);
+
+    it("should still have block data for first block", async function() {
+      await web3.eth.getBlock(1);
+    });
+
+    it("should have a receipt for the previous transaction", async function() {
+      const receipt = await web3.eth.getTransactionReceipt(tx.transactionHash);
+      assert.notStrictEqual(receipt, null, "Receipt shouldn't be null!");
+      assert.strictEqual(receipt.transactionHash, tx.transactionHash);
+    });
+
+    it("should maintain the balance of the original accounts", async function() {
+      const balance = await web3.eth.getBalance(accounts[0]);
+      assert(balance > 98);
     });
   });
+};
 
-  it("should reopen the provider", function (done) {
-    provider = TestRPC.provider({
-      db_path: db_path,
-      mnemonic: "debris electric learn dove warrior grow pistol carry either curve radio hidden"
-      // logger: console,
-      // verbose: true
+const runRegressionTests = function(regressionProviderInit, memdbProviderInit) {
+  describe("Verify previous db compatibility", function() {
+    const web3 = new Web3();
+    const memdbWeb3 = new Web3();
+    const str = JSON.stringify;
+    const memdbBlocks = [];
+    const blocks = [];
+    let blockHeight = 2;
+    let accounts;
+    let memdbSend;
+
+    before("init provider", function() {
+      regressionProviderInit(function(p) {
+        web3.setProvider(p);
+      });
+      memdbProviderInit(function(p) {
+        memdbWeb3.setProvider(p);
+        memdbSend = generateSend(p);
+      });
     });
-    web3.setProvider(provider);
-    done();
-  });
 
-  it("should still be on block height 1", function (done) {
-    this.timeout(5000);
-    web3.eth.getBlockNumber(function(err, result) {
-      if (err) return done(err);
-      assert(result == 1);
-      done();
+    before("Gather accounts", async function() {
+      accounts = await web3.eth.getAccounts();
+    });
+
+    it("should have identical accounts (same mnemonic)", async function() {
+      const memAccounts = await memdbWeb3.eth.getAccounts();
+      assert.strictEqual(str(accounts), str(memAccounts), "accounts should be equal on both chains");
+    });
+
+    it(`should be on block height ${blockHeight} (db store)`, async function() {
+      const result = await web3.eth.getBlockNumber();
+      assert(result === blockHeight);
+    });
+
+    it("should be on block height 0 (mem store)", async function() {
+      const result = await memdbWeb3.eth.getBlockNumber();
+      assert(result === 0);
+    });
+
+    it("should issue/accept two tx's (mem store)", async function() {
+      // Don't change the details of this tx - it's needed to deterministically match a manually created
+      // DB with prior versions of ganache-core
+      let { timestamp } = await memdbWeb3.eth.getBlock(0);
+      assert(timestamp);
+      const txOptions = {
+        from: accounts[0],
+        to: accounts[1],
+        value: 1
+      };
+      const receipt = await memdbSend("eth_sendTransaction", txOptions);
+      await memdbSend("evm_mine", ++timestamp);
+      const receipt2 = await memdbSend("eth_sendTransaction", txOptions);
+      await memdbSend("evm_mine", ++timestamp);
+      assert(receipt.result, "Should return a tx hash");
+      assert(receipt2.result, "Should return a tx hash");
+    });
+
+    it("should be on block height 2 (mem store)", async function() {
+      const result = await memdbWeb3.eth.getBlockNumber();
+      assert(result === 2);
+    });
+
+    it.skip("should produce identical blocks (persistence db - memdb)", async function() {
+      blocks.push(await web3.eth.getBlock(0, true));
+      blocks.push(await web3.eth.getBlock(1, true));
+      blocks.push(await web3.eth.getBlock(2, true));
+      memdbBlocks.push(await memdbWeb3.eth.getBlock(0, true));
+      memdbBlocks.push(await memdbWeb3.eth.getBlock(1, true));
+      memdbBlocks.push(await memdbWeb3.eth.getBlock(2, true));
+      for (let i = 0; i < blocks.length; i++) {
+        assert.strictEqual(str(blocks[i]), str(memdbBlocks[i]));
+      }
+    });
+
+    it.skip("should produce identical transactions (persistence db - memdb)", async function() {
+      // Start at block 1 to skip genesis block
+      for (let i = 1; i < blocks.length; i++) {
+        const block = await memdbWeb3.eth.getBlock(i, false);
+        for (let j = 0; j < block.transactions.length; j++) {
+          const tx = await web3.eth.getTransaction(block.transactions[j]);
+          const memDbTx = await memdbWeb3.eth.getTransaction(block.transactions[j]);
+          assert(tx && memDbTx);
+          assert.strictEqual(str(tx), str(memDbTx));
+        }
+      }
     });
   });
+};
 
-  it("should still have block data for first block", function (done) {
-    web3.eth.getBlock(1, function(err, result) {
-      if (err) return done(err);
-      done();
-    });
+var mnemonic = "debris electric learn dove warrior grow pistol carry either curve radio hidden";
+
+const providerInitGen = function(opts) {
+  return function(cb) {
+    const provider = Ganache.provider(opts);
+    cb(provider);
+  };
+};
+
+describe("Default DB", function() {
+  const dbPath = temp.mkdirSync("testrpc-db-");
+
+  // initialize a persistent provider
+  const providerInit = providerInitGen({
+    db_path: dbPath,
+    mnemonic
   });
 
-  it("should have a receipt for the previous transaction", function(done) {
-    web3.eth.getTransactionReceipt(tx_hash, function(err, receipt) {
-      if (err) return done(err);
+  runTests(providerInit);
+});
 
-      assert.notEqual(receipt, null, "Receipt shouldn't be null!");
-      assert.equal(receipt.transactionHash, tx_hash);
-      done();
-    })
+describe("Custom DB", function() {
+  const db = memdown();
+
+  // initialize a custom persistence provider
+  const providerInit = providerInitGen({
+    db,
+    mnemonic
   });
 
-  it("should maintain the balance of the original accounts", function (done) {
-    web3.eth.getBalance(accounts[0], function(err, balance) {
-      if (err) return done(err);
-      assert(balance.toNumber() > 98);
-      done();
-    });
-  });
+  runTests(providerInit);
+});
 
+describe("Regression test DB", function() {
+  // Don't change these options, we need these to match the saved chain in ./test/testdb
+  const db = memdown();
+  const dbPath = join(__dirname, "/testdb");
+  const mnemonic = "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
+  const time = new Date("2009-01-03T18:15:05+00:00");
+  const networkId = "1337";
+  const blockTime = 1000; // An abundantly sufficient block time used with evm_mine for deterministic results
+
+  // initialize a custom persistence provider
+  const options = { mnemonic, network_id: networkId, time, blockTime };
+  const dbOptions = Object.assign({}, options, { db_path: dbPath });
+  const memdbOptions = Object.assign({}, options, { db });
+
+  const dbProviderInit = providerInitGen(dbOptions);
+  const memdbProviderInit = providerInitGen(memdbOptions);
+
+  runRegressionTests(dbProviderInit, memdbProviderInit);
 });

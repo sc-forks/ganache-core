@@ -1,27 +1,17 @@
-var Web3 = require('web3');
-var assert = require('assert');
-var TestRPC = require("../index.js");
+const assert = require("assert");
+const initializeTestProvider = require("./helpers/web3/initializeTestProvider");
 
-describe("Swarm", function(done) {
-  var web3 = new Web3();
-  var provider;
-
-  before("Initialize the provider", function() {
-    provider = TestRPC.provider();
-    web3.setProvider(provider);
+describe("Swarm", function() {
+  const context = initializeTestProvider();
+  it.skip("should get swarm info (bzz_info)", async function() {
+    const { web3 } = context;
+    const result = await web3.bzz.getInfo();
+    assert.isArray(result, "Stub returns empty array");
   });
 
-  it.skip("should get swarm info (bzz_info)", function(done) {
-    web3.bzz.getInfo(function(err, result){
-      assert.isArray(result, "Stub returns empty array")
-      done();
-    })
-  });
-
-  it.skip("should get swarm hive (bzz_hive)", function(done) {
-    web3.bzz.getHive(function(err, result){
-      assert.isArray(result, "Stub returns empty array")
-      done();
-    })
+  it.skip("should get swarm hive (bzz_hive)", async function() {
+    const { web3 } = context;
+    const result = await web3.bzz.getHive();
+    assert.isArray(result, "Stub returns empty array");
   });
 });

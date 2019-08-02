@@ -1,21 +1,11 @@
-var Web3 = require('web3');
-var assert = require('assert');
-var TestRPC = require("../index.js");
+const assert = require("assert");
+const initializeTestProvider = require("./helpers/web3/initializeTestProvider");
 
+describe("Ethereum", function() {
+  it("should get ethereum version (eth_protocolVersion)", async function() {
+    const { web3 } = await initializeTestProvider();
 
-describe("Ethereum", function(done) {
-  var web3 = new Web3();
-  var provider;
-
-  before("Initialize the provider", function() {
-    provider = TestRPC.provider();
-    web3.setProvider(provider);
-  });
-
-  it("should get ethereum version (eth_protocolVersion)", function(done) {
-    web3.version.getEthereum(function(err, result){
-      assert.equal(result, "63", "Network Version should be 63");
-      done();
-    })
+    const result = await web3.eth.getProtocolVersion();
+    assert.strictEqual(result, "63", "Network Version should be 63");
   });
 });

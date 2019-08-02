@@ -5,5 +5,8 @@ TODO
 .tern-project
 .DS_Store
 .tern-port
-yarn.lock
-package-lock.json
+.vscode
+build
+npm-shrinkwrap.json.bak
+test/testdb
+.nyc_output/
