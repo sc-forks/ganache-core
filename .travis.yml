@@ -1,8 +1,18 @@
+version: ~> 1.0
 language: node_js
 node_js:
-  - "node"
-  - "lts/*"
-  - "lts/carbon"
+  - "10"
+  - "12"
+  - "14.13.0"
+os:
+  - linux
+  - osx
+  - windows
+# using xcode9.2 forces osx 10.12, which is WAAAYYYYYY faster than 10.13
+# in fact, we couldn't get osx 10.13 to ever finish the running the tests
+osx_image: xcode9.2
+git:
+  autocrlf: false
 
 addons:
   apt:
@@ -13,17 +23,16 @@ addons:
       - g++-5
 
 before_install:
+  # Apply workaround for git:// packages
+  - git config --global url."https://github.com/".insteadOf ssh://git@github.com/
   - if [ $TRAVIS_OS_NAME == "linux" ]; then
       export CC="gcc-5";
       export CXX="g++-5";
       export LINK="gcc-5";
       export LINKXX="g++-5";
     fi
-  - nvm --version
-  - node --version
-  - npm --version
-  - gcc --version
-  - g++ --version
 
-after_success:
-  npm run coverage
+script:
+  - npm run prepare
+  - npm run test
+  - npm run test-smoke

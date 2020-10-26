@@ -29,9 +29,14 @@ function compile(mainContractName, contractFileNames = [], contractSubdirectory,
       }
     }
   };
-  input.settings.evmVersion = hardfork;
+  input.settings.evmVersion = hardfork === "muirGlacier" ? "istanbul" : hardfork;
 
   const result = JSON.parse(solc.compile(JSON.stringify(input)));
+
+  if (result.errors && result.errors.some((error) => error.severity === "error")) {
+    const errorMessages = result.errors.map((error) => error.formattedMessage);
+    throw new Error(`Could not compile test contracts:\n${errorMessages.join("")}`);
+  }
 
   const _mainContractName = mainContractName.endsWith(".sol")
     ? mainContractName.replace(/\.sol$/i, "")
@@ -71,7 +76,7 @@ async function deploy(abi, bytecode, web3, options = {}, existingAccounts = []) 
   const gas = options.gas || block.gasLimit;
   const contract = new web3.eth.Contract(abi);
   const instance = await contract
-    .deploy({ data: bytecode })
+    .deploy({ data: bytecode, arguments: options.constructorArguments })
     .send({ from: accounts[0], gas })
     .on("receipt", (rcpt) => {
       receipt = rcpt;
