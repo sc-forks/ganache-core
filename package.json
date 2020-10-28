@@ -1,6 +1,6 @@
 {
   "name": "ganache-core",
-  "version": "2.13.0",
+  "version": "2.13.1",
   "main": "./index.js",
   "types": "./typings/index.d.ts",
   "engines": {
@@ -16,7 +16,7 @@
     "build": "webpack-cli --config ./webpack/node/core.webpack.config.js",
     "build-web": "webpack-cli --config ./webpack/web-experimental/core.webpack.config.js",
     "format": "prettier --write \"{lib,perf,test}/**/*.js\" && eslint --fix --ignore-path .gitignore .",
-    "prepare": "patch-package",
+    "prepare": "patch-package --exclude 'nothing'",
     "prepublishOnly": "npm run test && npm run build && npm run test-build && npm prune --production && mv npm-shrinkwrap.json npm-shrinkwrap.json.bak && npm shrinkwrap",
     "postpublish": "rm npm-shrinkwrap.json && mv npm-shrinkwrap.json.bak npm-shrinkwrap.json && npm ci",
     "test": "npm run _lint && npm run nyc_mocha ./test/local",
@@ -26,8 +26,7 @@
     "coverage": "nyc report --reporter=text-lcov | coveralls"
   },
   "bundleDependencies": [
-    "keccak",
-    "web3-provider-engine"
+    "keccak"
   ],
   "dependencies": {
     "abstract-leveldown": "3.0.0",
@@ -37,8 +36,8 @@
     "clone": "2.1.2",
     "debug": "3.2.6",
     "encoding-down": "5.0.4",
-    "eth-sig-util": "2.3.0",
-    "ethereumjs-abi": "0.6.7",
+    "eth-sig-util": "^2.0.0",
+    "ethereumjs-abi": "0.6.8",
     "ethereumjs-account": "3.0.0",
     "ethereumjs-block": "2.2.2",
     "ethereumjs-common": "1.5.0",
